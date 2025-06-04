@@ -1,0 +1,372 @@
+<!-- github-trending-repos-rank-change-tracker -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GitHub Trending Repos Rank Change</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #f6f8fa;
+    }
+    header {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+    h1 {
+      color: #24292e;
+    }
+    .loader {
+      text-align: center;
+      padding: 40px;
+      font-size: 18px;
+    }
+    .error {
+      background-color: #ffebe9;
+      border: 1px solid #ff8080;
+      border-radius: 6px;
+      padding: 15px;
+      margin: 20px 0;
+      color: #cf222e;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background-color: white;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    th, td {
+      padding: 12px 15px;
+      text-align: left;
+      border-bottom: 1px solid #e1e4e8;
+    }
+    th {
+      background-color: #f6f8fa;
+      font-weight: 600;
+      color: #24292e;
+    }
+    tr:hover {
+      background-color: #f6f8fa;
+    }
+    .rank-change {
+      font-weight: 600;
+      text-align: center;
+    }
+    .rank-up {
+      color: #2da44e;
+    }
+    .rank-down {
+      color: #cf222e;
+    }
+    .rank-same {
+      color: #768390;
+    }
+    .repo-name {
+      font-weight: 600;
+      color: #0969da;
+      cursor: pointer;
+      text-decoration: none;
+    }
+    .repo-name:hover {
+      text-decoration: underline;
+    }
+    .repo-description {
+      color: #57606a;
+      font-size: 14px;
+      max-width: 400px;
+    }
+    .language-tag {
+      display: inline-block;
+      font-size: 12px;
+      padding: 2px 6px;
+      border-radius: 10px;
+      background-color: #ddf4ff;
+      color: #0969da;
+    }
+    .not-in-list {
+      font-style: italic;
+      color: #768390;
+    }
+    .controls {
+      margin-bottom: 20px;
+      display: flex;
+      gap: 20px;
+      align-items: center;
+    }
+    select {
+      padding: 8px 12px;
+      border-radius: 6px;
+      border: 1px solid #d0d7de;
+      background-color: white;
+      font-size: 14px;
+    }
+    .btn-refresh {
+      padding: 8px 16px;
+      background-color: #2da44e;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .btn-refresh:hover {
+      background-color: #2c974b;
+    }
+    footer {
+      margin-top: 40px;
+      text-align: center;
+      font-size: 14px;
+      color: #57606a;
+    }
+
+    /* Dark theme */
+    @media (prefers-color-scheme: dark) {
+      body { background-color: #0d1117; color: #c9d1d9; }
+      header h1, header p { color: #c9d1d9; }
+      .loader { color: #c9d1d9; }
+      .error { background-color: #5e1914; border-color: #f85149; color: #f85149; }
+      table { background-color: #161b22; box-shadow: 0 1px 3px rgba(255,255,255,0.1); }
+      th { background-color: #0d1117; color: #c9d1d9; }
+      td, th { border-bottom-color: #30363d; }
+      tr:hover { background-color: #21262d; }
+      .repo-name { color: #58a6ff; }
+      .repo-description { color: #8b949e; }
+      .language-tag { background-color: #1f6feb; color: #ffffff; }
+      .not-in-list { color: #8b949e; }
+      select { background-color: #0d1117; color: #c9d1d9; border-color: #30363d; }
+      .btn-refresh { background-color: #238636; }
+      .btn-refresh:hover { background-color: #2ea043; }
+      footer { color: #8b949e; }
+      footer a { color: #58a6ff; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>GitHub Trending Repos Rank Change</h1>
+    <p>Compare repository rankings between past week and past month</p>
+  </header>
+
+  <main>
+    <div class="controls">
+      <div>
+        <label for="language-filter">Language: </label>
+        <select id="language-filter">
+          <option value="All">All Languages</option>
+          <option value="JavaScript">JavaScript</option>
+          <option value="TypeScript">TypeScript</option>
+          <option value="Python">Python</option>
+          <option value="Java">Java</option>
+          <option value="Go">Go</option>
+          <option value="Rust">Rust</option>
+          <option value="C%2B%2B">C++</option>
+          <option value="C%23">C#</option>
+        </select>
+      </div>
+      <button class="btn-refresh" id="refresh-btn">Refresh Data</button>
+    </div>
+
+    <div id="loading" class="loader">Loading trending repositories data...</div>
+    <div id="error" class="error" style="display: none;"></div>
+    <div id="results" style="display: none;">
+      <table id="repos-table">
+        <thead>
+          <tr>
+            <th>Week Rank</th>
+            <th>Month Rank</th>
+            <th>Rank Change</th>
+            <th>Repository</th>
+            <th>Language</th>
+            <th>Week Score</th>
+            <th>Month Score</th>
+          </tr>
+        </thead>
+        <tbody id="repos-tbody">
+          <!-- Table rows will be populated by JavaScript -->
+        </tbody>
+      </table>
+    </div>
+  </main>
+
+  <footer>
+    <p>Data provided by <a href="https://api.ossinsight.io/v1" target="_blank">OSSInsight API</a></p>
+  </footer>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const loadingEl = document.getElementById('loading');
+      const errorEl = document.getElementById('error');
+      const resultsEl = document.getElementById('results');
+      const tableBodyEl = document.getElementById('repos-tbody');
+      const languageFilter = document.getElementById('language-filter');
+      const refreshBtn = document.getElementById('refresh-btn');
+
+      // Load data on page load
+      fetchData();
+
+      // Add event listeners
+      languageFilter.addEventListener('change', fetchData);
+      refreshBtn.addEventListener('click', fetchData);
+
+      async function fetchData() {
+        // Reset UI state
+        loadingEl.style.display = 'block';
+        errorEl.style.display = 'none';
+        resultsEl.style.display = 'none';
+        tableBodyEl.innerHTML = '';
+
+        try {
+          const language = languageFilter.value;
+
+          // Fetch data for both time periods
+          const [weekData, monthData] = await Promise.all([
+            fetchTrendingRepos('past_week', language),
+            fetchTrendingRepos('past_month', language)
+          ]);
+
+          // Process and display the data
+          processAndDisplayData(weekData, monthData);
+        } catch (error) {
+          console.error('Error fetching data:', error);
+          errorEl.textContent = `Failed to fetch data: ${error.message}`;
+          errorEl.style.display = 'block';
+        } finally {
+          loadingEl.style.display = 'none';
+        }
+      }
+
+      async function fetchTrendingRepos(period, language) {
+        const baseUrl = 'https://api.ossinsight.io/v1/trends/repos/';
+        const url = `${baseUrl}?period=${period}&language=${language}`;
+
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error(`API responded with status ${response.status}`);
+        }
+
+        const data = await response.json();
+        return data.data.rows;
+      }
+
+      function processAndDisplayData(weekRepos, monthRepos) {
+        // Create a map of all repos with their ranks in both periods
+        const reposMap = new Map();
+
+        // Process week data
+        weekRepos.forEach((repo, index) => {
+          reposMap.set(repo.repo_name, {
+            repoName: repo.repo_name,
+            description: repo.description,
+            language: repo.primary_language,
+            weekRank: index + 1,
+            weekScore: parseFloat(repo.total_score),
+            monthRank: null,
+            monthScore: null
+          });
+        });
+
+        // Process month data and update the map
+        monthRepos.forEach((repo, index) => {
+          const monthRank = index + 1;
+          const monthScore = parseFloat(repo.total_score);
+
+          if (reposMap.has(repo.repo_name)) {
+            // Update existing entry
+            const repoData = reposMap.get(repo.repo_name);
+            repoData.monthRank = monthRank;
+            repoData.monthScore = monthScore;
+          } else {
+            // Add new entry for repos only in month data
+            reposMap.set(repo.repo_name, {
+              repoName: repo.repo_name,
+              description: repo.description,
+              language: repo.primary_language,
+              weekRank: null,
+              weekScore: null,
+              monthRank: monthRank,
+              monthScore: monthScore
+            });
+          }
+        });
+
+        // Convert map to array and sort by week rank (null values at the end)
+        const reposArray = Array.from(reposMap.values())
+          .sort((a, b) => {
+            if (a.weekRank === null) return 1;
+            if (b.weekRank === null) return -1;
+            return a.weekRank - b.weekRank;
+          });
+
+        // Display the data
+        reposArray.forEach(repo => {
+          const row = document.createElement('tr');
+
+          // Calculate rank change
+          let rankChange = null;
+          let rankChangeClass = '';
+          let rankChangeText = '';
+
+          if (repo.weekRank !== null && repo.monthRank !== null) {
+            rankChange = repo.monthRank - repo.weekRank;
+
+            if (rankChange > 0) {
+              rankChangeClass = 'rank-up';
+              rankChangeText = `↑ ${rankChange}`;
+            } else if (rankChange < 0) {
+              rankChangeClass = 'rank-down';
+              rankChangeText = `↓ ${Math.abs(rankChange)}`;
+            } else {
+              rankChangeClass = 'rank-same';
+              // rankChangeText = '—';
+              rankChangeText = '0';
+            }
+          } else if (repo.weekRank !== null) {
+            rankChangeClass = 'rank-up';
+            rankChangeText = 'New in week';
+          } else {
+            rankChangeClass = 'rank-down';
+            rankChangeText = 'Not in week';
+          }
+
+          // Create table cells
+          row.innerHTML = `
+            <td>${repo.weekRank !== null ? repo.weekRank : '<span class="not-in-list">N/A</span>'}</td>
+            <td>${repo.monthRank !== null ? repo.monthRank : '<span class="not-in-list">N/A</span>'}</td>
+            <td class="rank-change ${rankChangeClass}">${rankChangeText}</td>
+            <td>
+              <div class="repo-name" data-repo="${repo.repoName}">${repo.repoName}</div>
+              <div class="repo-description">${repo.description || ''}</div>
+            </td>
+            <td>${repo.language ? `<span class="language-tag">${repo.language}</span>` : ''}</td>
+            <td>${repo.weekScore !== null ? repo.weekScore.toFixed(1) : '-'}</td>
+            <td>${repo.monthScore !== null ? repo.monthScore.toFixed(1) : '-'}</td>
+          `;
+
+          tableBodyEl.appendChild(row);
+        });
+
+        // Add click event listeners to repo names
+        tableBodyEl.addEventListener('click', (event) => {
+          if (event.target.classList.contains('repo-name')) {
+            const repoName = event.target.getAttribute('data-repo');
+            if (repoName) {
+              window.open(`https://github.com/${repoName}`, '_blank');
+            }
+          }
+        });
+
+        resultsEl.style.display = 'block';
+      }
+    });
+  </script>
+</body>
+</html>
