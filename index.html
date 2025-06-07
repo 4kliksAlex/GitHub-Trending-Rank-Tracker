@@ -148,6 +148,37 @@
       footer { color: #8b949e; }
       footer a { color: #58a6ff; }
     }
+    .pie-chart {
+      width: 40px;
+      height: 40px;
+      margin: 0 auto;
+    }
+    .pie-chart circle {
+      fill: none;
+      stroke-width: 8;
+    }
+    .pie-background {
+      stroke: #e1e4e8;
+    }
+    .pie-foreground {
+      stroke: #2da44e;
+      transform: rotate(-90deg);
+      transform-origin: 50% 50%;
+    }
+    .pie-text {
+      font-size: 10px;
+      text-anchor: middle;
+      dominant-baseline: central;
+      fill: #57606a;
+    }
+
+    /* Dark theme */
+    @media (prefers-color-scheme: dark) {
+      /* ...existing code... */
+      .pie-background { stroke: #30363d; }
+      .pie-foreground { stroke: #238636; }
+      .pie-text { fill: #8b949e; }
+    }
   </style>
 </head>
 <body>
@@ -186,6 +217,7 @@
             <th>Rank Change</th>
             <th>Repository</th>
             <th>Language</th>
+            <th>Week/Month<br/>Score Ratio</th>
             <th>Week Score</th>
             <th>Month Score</th>
           </tr>
@@ -337,6 +369,24 @@
             rankChangeText = 'Not in week';
           }
 
+          // Calculate score ratio and create pie chart
+          let pieChartHtml = '-';
+          if (repo.weekScore !== null && repo.monthScore !== null && repo.monthScore > 0) {
+            const ratio = Math.min(repo.weekScore / repo.monthScore, 1); // Cap at 100%
+            const percentage = Math.round(ratio * 100);
+            const circumference = 2 * Math.PI * 16; // radius = 16
+            const strokeDasharray = `${ratio * circumference} ${circumference}`;
+            
+            pieChartHtml = `
+              <svg class="pie-chart" viewBox="0 0 40 40">
+                <circle class="pie-background" cx="20" cy="20" r="16"></circle>
+                <circle class="pie-foreground" cx="20" cy="20" r="16" 
+                        style="stroke-dasharray: ${strokeDasharray}; stroke-dashoffset: 0;"></circle>
+                <text class="pie-text" x="20" y="20">${percentage}%</text>
+              </svg>
+            `;
+          }
+
           // Create table cells
           row.innerHTML = `
             <td>${repo.weekRank !== null ? repo.weekRank : '<span class="not-in-list">N/A</span>'}</td>
@@ -347,6 +397,7 @@
               <div class="repo-description">${repo.description || ''}</div>
             </td>
             <td>${repo.language ? `<span class="language-tag">${repo.language}</span>` : ''}</td>
+            <td style="text-align: center;">${pieChartHtml}</td>
             <td>${repo.weekScore !== null ? repo.weekScore.toFixed(1) : '-'}</td>
             <td>${repo.monthScore !== null ? repo.monthScore.toFixed(1) : '-'}</td>
           `;
