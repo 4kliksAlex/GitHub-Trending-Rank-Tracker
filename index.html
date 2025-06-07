@@ -250,13 +250,21 @@
       const refreshBtn = document.getElementById('refresh-btn');
       const periodFilter = document.getElementById('period-filter');
 
+      // Cache for API responses
+      const cache = new Map();
+      const CACHE_DURATION = 15 * 60 * 1000; // 15 minutes in milliseconds
+
       // Load data on page load
       fetchData();
 
       // Add event listeners
       languageFilter.addEventListener('change', fetchData);
       periodFilter.addEventListener('change', fetchData);
-      refreshBtn.addEventListener('click', fetchData);
+      refreshBtn.addEventListener('click', () => {
+        // Clear cache when refresh is clicked
+        cache.clear();
+        fetchData();
+      });
 
       async function fetchData() {
         // Reset UI state
@@ -313,7 +321,31 @@
         document.getElementById('score2-header').textContent = `${period2Label} Score`;
       }
 
+      function getCacheKey(period, language) {
+        return `${period}_${language}`;
+      }
+
+      function isCacheValid(cacheEntry) {
+        return Date.now() - cacheEntry.timestamp < CACHE_DURATION;
+      }
+
       async function fetchTrendingRepos(period, language) {
+        const cacheKey = getCacheKey(period, language);
+        
+        // Check if we have valid cached data
+        if (cache.has(cacheKey)) {
+          const cacheEntry = cache.get(cacheKey);
+          if (isCacheValid(cacheEntry)) {
+            console.log(`Using cached data for ${cacheKey}`);
+            return cacheEntry.data;
+          } else {
+            // Remove expired cache entry
+            cache.delete(cacheKey);
+          }
+        }
+
+        // Fetch new data
+        console.log(`Fetching new data for ${cacheKey}`);
         const baseUrl = 'https://api.ossinsight.io/v1/trends/repos/';
         const url = `${baseUrl}?period=${period}&language=${language}`;
 
@@ -323,7 +355,15 @@
         }
 
         const data = await response.json();
-        return data.data.rows;
+        const repos = data.data.rows;
+        
+        // Cache the response
+        cache.set(cacheKey, {
+          data: repos,
+          timestamp: Date.now()
+        });
+
+        return repos;
       }
 
       function processAndDisplayData(period1Repos, period2Repos, period1Label, period2Label) {
