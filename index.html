@@ -184,11 +184,18 @@
 <body>
   <header>
     <h1>GitHub Trending Repos Rank Change</h1>
-    <p>Compare repository rankings between past week and past month</p>
+    <p id="comparison-description">Compare repository rankings between past week and past month</p>
   </header>
 
   <main>
     <div class="controls">
+      <div>
+        <label for="period-filter">Comparison: </label>
+        <select id="period-filter">
+          <option value="week-month">Week vs Month</option>
+          <option value="month-3months">Month vs 3 Months</option>
+        </select>
+      </div>
       <div>
         <label for="language-filter">Language: </label>
         <select id="language-filter">
@@ -212,14 +219,14 @@
       <table id="repos-table">
         <thead>
           <tr>
-            <th>Week Rank</th>
-            <th>Month Rank</th>
+            <th id="period1-header">Week Rank</th>
+            <th id="period2-header">Month Rank</th>
             <th>Rank Change</th>
             <th>Repository</th>
             <th>Language</th>
-            <th>Week/Month<br/>Score Ratio</th>
-            <th>Week Score</th>
-            <th>Month Score</th>
+            <th id="ratio-header">Week/Month<br/>Score Ratio</th>
+            <th id="score1-header">Week Score</th>
+            <th id="score2-header">Month Score</th>
           </tr>
         </thead>
         <tbody id="repos-tbody">
@@ -241,12 +248,14 @@
       const tableBodyEl = document.getElementById('repos-tbody');
       const languageFilter = document.getElementById('language-filter');
       const refreshBtn = document.getElementById('refresh-btn');
+      const periodFilter = document.getElementById('period-filter');
 
       // Load data on page load
       fetchData();
 
       // Add event listeners
       languageFilter.addEventListener('change', fetchData);
+      periodFilter.addEventListener('change', fetchData);
       refreshBtn.addEventListener('click', fetchData);
 
       async function fetchData() {
@@ -258,15 +267,33 @@
 
         try {
           const language = languageFilter.value;
+          const periodComparison = periodFilter.value;
+
+          // Determine which periods to fetch based on selection
+          let period1, period2, period1Label, period2Label;
+          if (periodComparison === 'week-month') {
+            period1 = 'past_week';
+            period2 = 'past_month';
+            period1Label = 'Week';
+            period2Label = 'Month';
+          } else {
+            period1 = 'past_month';
+            period2 = 'past_3_months';
+            period1Label = 'Month';
+            period2Label = '3 Months';
+          }
+
+          // Update UI labels
+          updateUILabels(period1Label, period2Label);
 
           // Fetch data for both time periods
-          const [weekData, monthData] = await Promise.all([
-            fetchTrendingRepos('past_week', language),
-            fetchTrendingRepos('past_month', language)
+          const [period1Data, period2Data] = await Promise.all([
+            fetchTrendingRepos(period1, language),
+            fetchTrendingRepos(period2, language)
           ]);
 
           // Process and display the data
-          processAndDisplayData(weekData, monthData);
+          processAndDisplayData(period1Data, period2Data, period1Label, period2Label);
         } catch (error) {
           console.error('Error fetching data:', error);
           errorEl.textContent = `Failed to fetch data: ${error.message}`;
@@ -274,6 +301,16 @@
         } finally {
           loadingEl.style.display = 'none';
         }
+      }
+
+      function updateUILabels(period1Label, period2Label) {
+        document.getElementById('comparison-description').textContent = 
+          `Compare repository rankings between past ${period1Label.toLowerCase()} and past ${period2Label.toLowerCase()}`;
+        document.getElementById('period1-header').textContent = `${period1Label} Rank`;
+        document.getElementById('period2-header').textContent = `${period2Label} Rank`;
+        document.getElementById('ratio-header').innerHTML = `${period1Label}/${period2Label}<br/>Score Ratio`;
+        document.getElementById('score1-header').textContent = `${period1Label} Score`;
+        document.getElementById('score2-header').textContent = `${period2Label} Score`;
       }
 
       async function fetchTrendingRepos(period, language) {
@@ -289,53 +326,53 @@
         return data.data.rows;
       }
 
-      function processAndDisplayData(weekRepos, monthRepos) {
+      function processAndDisplayData(period1Repos, period2Repos, period1Label, period2Label) {
         // Create a map of all repos with their ranks in both periods
         const reposMap = new Map();
 
-        // Process week data
-        weekRepos.forEach((repo, index) => {
+        // Process period1 data
+        period1Repos.forEach((repo, index) => {
           reposMap.set(repo.repo_name, {
             repoName: repo.repo_name,
             description: repo.description,
             language: repo.primary_language,
-            weekRank: index + 1,
-            weekScore: parseFloat(repo.total_score),
-            monthRank: null,
-            monthScore: null
+            period1Rank: index + 1,
+            period1Score: parseFloat(repo.total_score),
+            period2Rank: null,
+            period2Score: null
           });
         });
 
-        // Process month data and update the map
-        monthRepos.forEach((repo, index) => {
-          const monthRank = index + 1;
-          const monthScore = parseFloat(repo.total_score);
+        // Process period2 data and update the map
+        period2Repos.forEach((repo, index) => {
+          const period2Rank = index + 1;
+          const period2Score = parseFloat(repo.total_score);
 
           if (reposMap.has(repo.repo_name)) {
             // Update existing entry
             const repoData = reposMap.get(repo.repo_name);
-            repoData.monthRank = monthRank;
-            repoData.monthScore = monthScore;
+            repoData.period2Rank = period2Rank;
+            repoData.period2Score = period2Score;
           } else {
-            // Add new entry for repos only in month data
+            // Add new entry for repos only in period2 data
             reposMap.set(repo.repo_name, {
               repoName: repo.repo_name,
               description: repo.description,
               language: repo.primary_language,
-              weekRank: null,
-              weekScore: null,
-              monthRank: monthRank,
-              monthScore: monthScore
+              period1Rank: null,
+              period1Score: null,
+              period2Rank: period2Rank,
+              period2Score: period2Score
             });
           }
         });
 
-        // Convert map to array and sort by week rank (null values at the end)
+        // Convert map to array and sort by period1 rank (null values at the end)
         const reposArray = Array.from(reposMap.values())
           .sort((a, b) => {
-            if (a.weekRank === null) return 1;
-            if (b.weekRank === null) return -1;
-            return a.weekRank - b.weekRank;
+            if (a.period1Rank === null) return 1;
+            if (b.period1Rank === null) return -1;
+            return a.period1Rank - b.period1Rank;
           });
 
         // Display the data
@@ -347,8 +384,8 @@
           let rankChangeClass = '';
           let rankChangeText = '';
 
-          if (repo.weekRank !== null && repo.monthRank !== null) {
-            rankChange = repo.monthRank - repo.weekRank;
+          if (repo.period1Rank !== null && repo.period2Rank !== null) {
+            rankChange = repo.period2Rank - repo.period1Rank;
 
             if (rankChange > 0) {
               rankChangeClass = 'rank-up';
@@ -358,21 +395,20 @@
               rankChangeText = `↓ ${Math.abs(rankChange)}`;
             } else {
               rankChangeClass = 'rank-same';
-              // rankChangeText = '—';
               rankChangeText = '0';
             }
-          } else if (repo.weekRank !== null) {
+          } else if (repo.period1Rank !== null) {
             rankChangeClass = 'rank-up';
-            rankChangeText = 'New in week';
+            rankChangeText = `New in ${period1Label.toLowerCase()}`;
           } else {
             rankChangeClass = 'rank-down';
-            rankChangeText = 'Not in week';
+            rankChangeText = `Not in ${period1Label.toLowerCase()}`;
           }
 
           // Calculate score ratio and create pie chart
           let pieChartHtml = '-';
-          if (repo.weekScore !== null && repo.monthScore !== null && repo.monthScore > 0) {
-            const ratio = Math.min(repo.weekScore / repo.monthScore, 1); // Cap at 100%
+          if (repo.period1Score !== null && repo.period2Score !== null && repo.period2Score > 0) {
+            const ratio = Math.min(repo.period1Score / repo.period2Score, 1); // Cap at 100%
             const percentage = Math.round(ratio * 100);
             const circumference = 2 * Math.PI * 16; // radius = 16
             const strokeDasharray = `${ratio * circumference} ${circumference}`;
@@ -389,8 +425,8 @@
 
           // Create table cells
           row.innerHTML = `
-            <td>${repo.weekRank !== null ? repo.weekRank : '<span class="not-in-list">N/A</span>'}</td>
-            <td>${repo.monthRank !== null ? repo.monthRank : '<span class="not-in-list">N/A</span>'}</td>
+            <td>${repo.period1Rank !== null ? repo.period1Rank : '<span class="not-in-list">N/A</span>'}</td>
+            <td>${repo.period2Rank !== null ? repo.period2Rank : '<span class="not-in-list">N/A</span>'}</td>
             <td class="rank-change ${rankChangeClass}">${rankChangeText}</td>
             <td>
               <div class="repo-name" data-repo="${repo.repoName}">${repo.repoName}</div>
@@ -398,8 +434,8 @@
             </td>
             <td>${repo.language ? `<span class="language-tag">${repo.language}</span>` : ''}</td>
             <td style="text-align: center;">${pieChartHtml}</td>
-            <td>${repo.weekScore !== null ? repo.weekScore.toFixed(1) : '-'}</td>
-            <td>${repo.monthScore !== null ? repo.monthScore.toFixed(1) : '-'}</td>
+            <td>${repo.period1Score !== null ? repo.period1Score.toFixed(1) : '-'}</td>
+            <td>${repo.period2Score !== null ? repo.period2Score.toFixed(1) : '-'}</td>
           `;
 
           tableBodyEl.appendChild(row);
